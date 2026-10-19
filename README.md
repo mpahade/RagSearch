@@ -8,4 +8,6 @@ Hosted with GitHub Pages.
 
 ## How it works (30-second video)
 
+Full write-up (architecture, workflows, data model, project progress): [docs/PROJECT.md](docs/PROJECT.md)
+
 [▶ Watch the walkthrough](media/week2-rag-explainer.mp4): how PDFs from Google Drive are ingested into Neo4j and how the search API returns ranked passages.
