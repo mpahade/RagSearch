@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Handout Search</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column — query bar on top, ranked passage list below, highlighter marks on matched words */
+:root {
+  --bg: #f5f6f8;
+  --surface: #ffffff;
+  --fg: #1b2230;
+  --muted: #5d6676;
+  --line: #dde1e8;
+  --accent: #2346c7;
+  --accent-fg: #ffffff;
+  --mark: #ffe27a;
+  --mark-fg: #1b2230;
+  --danger: #b42318;
+  --danger-bg: #fdecea;
+  --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #11151c; --surface: #1a2029; --fg: #e6e9ef; --muted: #98a1b0;
+    --line: #2b3340; --accent: #7d97ff; --accent-fg: #0d1220;
+    --mark: #6b5a12; --mark-fg: #fff6cf; --danger: #ff8f84; --danger-bg: #3a1d1b;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg);
+  font: 15px/1.6 var(--body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+main { max-width: 760px; margin: 0 auto; padding-block: 48px 64px; display: grid; gap: 28px; }
+header { display: grid; gap: 6px; }
+.eyebrow { font: 500 12px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font: 700 clamp(30px, 6vw, 42px)/1.05 var(--display); margin: 0; text-wrap: balance; letter-spacing: -.01em; }
+.sub { color: var(--muted); margin: 0; max-width: 60ch; }
+
+form { display: grid; gap: 10px; }
+.bar { display: flex; gap: 8px; flex-wrap: wrap; }
+.bar input[type=search] {
+  flex: 1 1 260px; min-width: 0; font: 16px var(--body); color: var(--fg);
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px;
+}
+.bar select {
+  font: 14px var(--body); color: var(--fg); background: var(--surface);
+  border: 1px solid var(--line); border-radius: 10px; padding: 0 10px; height: 48px;
+}
+button {
+  font: 600 15px var(--body); border: 0; border-radius: 10px; cursor: pointer;
+  background: var(--accent); color: var(--accent-fg); padding: 0 20px; height: 48px;
+}
+button:disabled { opacity: .6; cursor: progress; }
+input:focus-visible, select:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.examples { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 13px; color: var(--muted); }
+.chip {
+  font: 13px var(--body); height: auto; padding: 4px 10px; border-radius: 999px;
+  background: transparent; color: var(--fg); border: 1px solid var(--line);
+}
+.chip:hover { border-color: var(--accent); color: var(--accent); }
+
+details.settings { font-size: 13px; color: var(--muted); }
+details.settings summary { cursor: pointer; width: fit-content; }
+.settings-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.settings-row input {
+  flex: 1 1 320px; min-width: 0; font: 13px var(--mono); color: var(--fg);
+  background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px;
+}
+
+.status { font: 13px var(--mono); color: var(--muted); min-height: 1.2em; font-variant-numeric: tabular-nums; }
+.error { background: var(--danger-bg); color: var(--danger); border-radius: 10px; padding: 12px 14px; font-size: 14px; }
+
+ol.results { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.result { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; display: grid; gap: 10px; min-width: 0; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: baseline; }
+.doc { font: 600 15px var(--body); overflow-wrap: anywhere; }
+.where { font: 12px var(--mono); color: var(--muted); }
+.rel { margin-left: auto; display: flex; align-items: center; gap: 8px; font: 12px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.meter { width: 64px; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.meter i { display: block; height: 100%; background: var(--accent); }
+.text { margin: 0; overflow-wrap: anywhere; }
+.text.clamped { display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; }
+mark { background: var(--mark); color: var(--mark-fg); border-radius: 3px; padding: 0 2px; }
+.toggle { justify-self: start; height: auto; padding: 0; background: none; color: var(--accent); font: 500 13px var(--body); }
+.empty { color: var(--muted); text-align: center; padding: 32px 0; border: 1px dashed var(--line); border-radius: 12px; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .result { animation: rise .25s ease both; }
+  @keyframes rise { from { transform: translateY(4px); opacity: .4; } to { transform: none; opacity: 1; } }
+}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <span class="eyebrow">Neo4j · Document → Chunk</span>
+    <h1>Handout Search</h1>
+    <p class="sub">Search the course handouts stored in your graph. Each result is a passage, with the handout it came from and how many of your words it contains.</p>
+  </header>
+
+  <form id="search-form" autocomplete="off" action="javascript:void(0)" onsubmit="return false">
+    <div class="bar">
+      <label class="eyebrow" for="q" hidden>Search query</label>
+      <input id="q" type="search" placeholder="e.g. prompt caching cost" value="latency budget" required>
+      <select id="limit" aria-label="Number of results">
+        <option value="5">5 results</option>
+        <option value="10" selected>10 results</option>
+        <option value="25">25 results</option>
+      </select>
+      <button id="go" type="button">Search</button>
+    </div>
+    <div class="examples">Try:
+      <button type="button" class="chip">time to first token</button>
+      <button type="button" class="chip">output tokens</button>
+      <button type="button" class="chip">retries</button>
+    </div>
+    <details class="settings">
+      <summary>Webhook address</summary>
+      <div class="settings-row">
+        <input id="endpoint" type="url" aria-label="n8n webhook URL">
+        <button type="button" id="reset" class="chip">Reset</button>
+      </div>
+    </details>
+  </form>
+
+  <section aria-live="polite" id="results-panel">
+    <div class="status" id="status"></div>
+    <div class="error" id="error" hidden></div>
+    <ol class="results" id="results"></ol>
+  </section>
+</main>
+
+<script>
+const DEFAULT_URL = "https://madhumita.app.n8n.cloud/webhook/neo4j-search";
+const $ = id => document.getElementById(id);
+const form = $("search-form"), q = $("q"), limit = $("limit"), go = $("go");
+const endpoint = $("endpoint"), statusEl = $("status"), errorEl = $("error"), list = $("results");
+
+function load(k, d) { try { return localStorage.getItem(k) || d; } catch { return d; } }
+function save(k, v) { try { localStorage.setItem(k, v); } catch {} }
+endpoint.value = load("neo4jSearchUrl", DEFAULT_URL);
+endpoint.addEventListener("change", () => save("neo4jSearchUrl", endpoint.value.trim()));
+$("reset").addEventListener("click", () => { endpoint.value = DEFAULT_URL; save("neo4jSearchUrl", DEFAULT_URL); });
+
+document.querySelectorAll(".examples .chip").forEach(b =>
+  b.addEventListener("click", () => { q.value = b.textContent; runSearch(); }));
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+function highlight(text, query) {
+  let terms = query.toLowerCase().split(/\s+/).filter(t => t.length > 2);
+  if (!terms.length && query.trim()) terms = [query.trim().toLowerCase()];
+  const safe = escapeHtml(text);
+  if (!terms.length) return safe;
+  const pattern = terms.map(t => escapeHtml(t).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).sort((a, b) => b.length - a.length).join("|");
+  return safe.replace(new RegExp(`(${pattern})`, "gi"), "<mark>$1</mark>");
+}
+
+function render(data, query, ms) {
+  list.innerHTML = "";
+  const results = data.results || [];
+  statusEl.textContent = `${results.length} passage${results.length === 1 ? "" : "s"} for “${query}” · ${ms} ms`;
+  if (!results.length) {
+    list.innerHTML = `<li class="empty">No passages contain these words. Try fewer or different terms.</li>`;
+    return;
+  }
+  results.forEach((r, i) => {
+    const pct = Math.round((r.score || 0) * 100);
+    const li = document.createElement("li");
+    li.className = "result";
+    li.style.animationDelay = `${i * 30}ms`;
+    li.innerHTML = `
+      <div class="meta">
+        <span class="doc">${escapeHtml(String(r.document ?? "Untitled"))}</span>
+        <span class="where">chunk ${r.chunk ?? "–"}</span>
+        <span class="rel" title="Share of query words found">${pct}% match <span class="meter"><i style="width:${pct}%"></i></span></span>
+      </div>
+      <p class="text clamped">${highlight(String(r.text ?? ""), query)}</p>
+      <button type="button" class="toggle">Show full passage</button>`;
+    const p = li.querySelector(".text"), t = li.querySelector(".toggle");
+    t.addEventListener("click", () => {
+      const open = p.classList.toggle("clamped");
+      t.textContent = open ? "Show full passage" : "Show less";
+    });
+    list.appendChild(li);
+  });
+}
+
+async function runSearch() {
+  const query = q.value.trim();
+  if (!query) return;
+  errorEl.hidden = true;
+  go.disabled = true; go.textContent = "Searching…";
+  statusEl.textContent = "Querying the graph…";
+  const t0 = performance.now();
+  try {
+    // A plain POST with the query in the URL and no custom headers counts as a
+    // "simple" request, so the browser skips the CORS preflight check.
+    const url = new URL(endpoint.value.trim() || DEFAULT_URL);
+    url.searchParams.set("q", query);
+    url.searchParams.set("limit", limit.value);
+    const res = await fetch(url.toString(), { method: "POST" });
+    if (!res.ok) throw new Error(`The webhook answered with status ${res.status}. Check that the n8n workflow is published.`);
+    const data = await res.json();
+    if (data.error) throw new Error(`Neo4j returned an error: ${data.error}`);
+    render(data, query, Math.round(performance.now() - t0));
+    if (window.scrollY > 0) document.getElementById("results-panel").scrollIntoView({ behavior: "smooth", block: "start" });
+  } catch (err) {
+    list.innerHTML = "";
+    statusEl.textContent = "";
+    errorEl.textContent = err instanceof TypeError
+      ? "Couldn't reach the webhook. Open this file from your Downloads folder in Chrome, Edge, Firefox or Safari (not inside the Claude preview), then check the address under “Webhook address”."
+      : err.message;
+    errorEl.hidden = false;
+  } finally {
+    go.disabled = false; go.textContent = "Search";
+  }
+}
+
+go.addEventListener("click", runSearch);
+q.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); runSearch(); } });
+form.addEventListener("submit", e => { e.preventDefault(); runSearch(); });
+runSearch();
+</script>
+</body>
+</html>
